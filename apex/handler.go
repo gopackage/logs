@@ -12,8 +12,6 @@ import (
 type Handler struct {
 	conn  net.Conn
 	buf   chan *log.Entry
-	sent  int64 // number of log entries sent
-	size  int64 // total size of log entries sent
 	stats logs.Stats
 }
 
@@ -58,12 +56,8 @@ func (h *Handler) Buffer(buf chan *log.Entry) chan *log.Entry {
 
 // HandleLog by converting to UDP and sending to logd.
 func (h *Handler) HandleLog(e *log.Entry) error {
-	b, err := json.Marshal(e)
-	if err != nil {
-		return err
-	}
-	_, err = h.conn.Write(b)
-	return err
+	h.buf <- e
+	return nil
 }
 
 // start the handler proessing the current buffer (blocks until the buffer is closed).
@@ -80,11 +74,9 @@ func (h *Handler) start() error {
 			if err != nil {
 				return err
 			}
-			h.sent++
-			h.size += int64(size)
 			if h.stats != nil {
-				h.stats.Count("logs.sent", h.sent)
-				h.stats.Value("logs.size", float64(h.size))
+				h.stats.Count("logs.sent", 1)
+				h.stats.Count("logs.size", size)
 			}
 		} else {
 			return nil
